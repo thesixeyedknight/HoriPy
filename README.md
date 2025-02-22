@@ -14,7 +14,7 @@
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/your-username/hori.git
+git clone https://github.com/thesixeyedknight/hori.git
 cd hori
 pip install -r requirements.txt
 ```
