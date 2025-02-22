@@ -1,0 +1,5 @@
+propka
+numpy
+freesasa
+tqdm
+requests

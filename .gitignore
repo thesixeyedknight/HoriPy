@@ -1,0 +1,89 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# Pytest cache
+.pytest_cache/
+.cache/
+*.cover
+
+# mypy
+.mypy_cache/
+
+# VSCode settings
+.vscode/
+
+# Mac OS metadata
+.DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Data files (specific to this project)
+data/*.tmp
+data/*.log
+data/*.bak
+
+# Ignore compiled Python files in project directories
+hori/__pycache__/
+mod_pdb2pqr/__pycache__/
+mod_pdb2pqr/hydrogens/__pycache__/
+mod_pdb2pqr/ligand/__pycache__/
+tests/__pycache__/
+
+# Ignore specific temporary files in mod_pdb2pqr/dat
+data/*.dat.bak
+mod_pdb2pqr/dat/*.tmp
+
+# Ignore scripts and build artifacts
+scripts/
+*.sh
+*.bat
+
+# Ignore Python egg files
+*.egg
+
+# Ignore temporary files
+*.swp
+*.swo
+
+# Ignore editor backups
+*~
+
+# Ignore coverage reports
+htmlcov/
+.coverage
+coverage.xml
+
+# Ignore wheel files
+*.whl
