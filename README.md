@@ -1,69 +1,63 @@
-# **hori\_project**
+# Hori: Molecular Interaction Analysis Toolkit
 
-**hori\_project** is a Python package designed for analyzing biomolecular structures. It offers robust tools for parsing structural files (PDB/CIF), computing molecular interactions (such as hydrogen bonds, salt bridges, π–π stacking, cation–π, and van der Waals forces), calculating interaction energies, and identifying higher-order interaction clusters.
+**Hori** is a Python library for analyzing molecular structures, focusing on computing higher-order interactions, solvent-accessible surface area (SASA), and energy-based residue interactions in biomolecules.
 
----
+## Features
+- Parses **PDB** and **CIF** files for protein structures.
+- Computes atomic and residue-level interactions (hydrogen bonds, salt bridges, van der Waals forces, etc.).
+- Calculates solvent-accessible surface area (SASA) using `freesasa`.
+- Generates higher-order residue interaction networks.
+- Supports customizable interaction parameters like pH, distance cutoffs, and angles.
 
-## 🚀 **Features**
+## Installation
 
-- 🔍 **Parsing**: Automatically detects and reads PDB/CIF file formats.
-- ⚡ **Energy Computations**: Calculates hydrogen bonds, salt bridges, van der Waals forces, and other molecular interactions.
-- �� **Structural Analysis**: Computes Ramachandran angles and solvent-accessible surface area (SASA).
-- 🖥️ **Higher-Order Interactions**: Supports multiprocessing to analyze complex residue interactions efficiently.
-
----
-
-## 📦 **Installation**
-
-To install **hori\_project**, clone the repository and install the required dependencies:
+Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/yourusername/hori_project.git
-cd hori_project
+git clone https://github.com/your-username/hori.git
+cd hori
 pip install -r requirements.txt
 ```
 
----
-
-## ⚙️ **Usage**
-
-### Command-Line Interface (CLI)
-
-Run structural analysis directly from the command line:
-
-```bash
-python -m hori.analysis --input examples/1a2p.cif --pH 7.0
-```
-
-### Using Within a Python Script
-
-You can also use **hori\_project** within your own Python scripts:
+## Usage Example
 
 ```python
+import sys
+sys.path.append('/path/to/hori_project')
+
 from hori.analysis import Hori
+from hori.output import save_output
 
-# Initialize the Hori class with input file and pH level
-hori_instance = Hori(filename="examples/1a2p.cif", pH=7.0)
+# Load a structure and perform analysis
+h1 = Hori(filename='/path/to/1BVP.cif', pH=7.0)
+save_output(h1, '1bvp_output.json')
 
-# Access computed interactions
-print(hori_instance.residue_interactions)
+# Access computed residue data
+for key, residue in h1.residues.items():
+    print(f"Residue {key}: SASA Total = {residue.sasa_total:.2f}")
 ```
 
----
+## Requirements
 
-## 🧪 **Testing**
+- `propka`
+- `numpy`
+- `freesasa`
+- `tqdm`
+- `requests`
 
-Unit tests are included in the `tests/` directory. Run all tests using:
+Install them with:
 
 ```bash
-pytest
+pip install -r requirements.txt
 ```
 
----
+## Running Tests
 
-## 📄 **License**
+```bash
+python -m unittest discover tests
+```
 
-This project is licensed under the [MIT License](LICENSE).
+## License
 
----
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
