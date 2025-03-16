@@ -52,7 +52,9 @@ def is_hbond(distance_map, at1, at2, atoms, bonds, user_params):
 	# distance check
 	d_a_dist_key = (min(donor_atom.id, other.id), max(donor_atom.id, other.id))
 	d_a_dist = distance_map.get(d_a_dist_key, None)
-	if d_a_dist is None or d_a_dist > user_params['d_a_dist']:
+	h_a_dist_key = (min(h_atom.id, other.id), max(h_atom.id, other.id))
+	h_a_dist = distance_map.get(h_a_dist_key, None)
+	if d_a_dist is None or d_a_dist > user_params['d_a_dist'] or h_a_dist is None or h_a_dist > user_params['h_a_dist']:
 		return False, None
 
 	# angle check

@@ -9,7 +9,7 @@ from hori.ramachandran import compute_ramachandran_angles
 class Hori:
 
 	def __init__(self, filename, file_type=None, highest_order='converge',
-			  pH=7.0, cutoff=7.0, d_a_dist=3.2, dha_angle=150.0, salt_bridge_dist=4.0,
+			  pH=7.0, cutoff=7.0, d_a_dist=3.9, h_a_dist = 2.5, dha_angle=90.0, salt_bridge_dist=4.0,
 			  pi_pi_dist=6.0, cation_pi_dist=6.0, pi_pi_angle=30.0):
 		self.filename = filename
 		self.file_type = file_type
@@ -18,6 +18,7 @@ class Hori:
 		self.ph = float(pH)
 		self.cutoff = cutoff
 		self.d_a_dist = d_a_dist
+		self.h_a_dist = h_a_dist
 		self.dha_angle = dha_angle
 		self.salt_bridge_dist = salt_bridge_dist
 		self.pi_pi_dist = pi_pi_dist
@@ -61,7 +62,7 @@ class Hori:
 		# Compute interactions
 		build_distance_map_parallel(self.residues, self.distance_map, cutoff=self.cutoff)
 
-		self.user_params = {'d_a_dist': self.d_a_dist, 'dha_angle': self.dha_angle,
+		self.user_params = {'d_a_dist': self.d_a_dist, 'dha_angle': self.dha_angle, 'h_a_dist': self.h_a_dist,
 					   'salt_bridge_dist': self.salt_bridge_dist, 'pi_pi_dist': self.pi_pi_dist,
 					   'cation_pi_dist': self.cation_pi_dist, 'pi_pi_angle': self.pi_pi_angle}
 		
