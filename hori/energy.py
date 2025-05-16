@@ -33,19 +33,19 @@ def hbond_energy(a1, a2, atoms, bonds):
 
 	# must be N/O
 	if not (donor_atom.atom_type.startswith('N') or donor_atom.atom_type.startswith('O')):
-		return simple_hbond_energy(donor_atom, acceptor_atom)
+		return simple_hbond_energy(h_atom, acceptor_atom)
 	if not (acceptor_atom.atom_type.startswith('N') or acceptor_atom.atom_type.startswith('O')):
-		return simple_hbond_energy(donor_atom, acceptor_atom)
+		return simple_hbond_energy(h_atom, acceptor_atom)
 
 	return specialized_hbond_energy(donor_atom, h_atom, acceptor_atom, atoms, bonds)
 
-def simple_hbond_energy(donor_atom, acceptor_atom):
-	d = distance(donor_atom, acceptor_atom)
+def simple_hbond_energy(h_atom, acceptor_atom):
+	d = distance(h_atom, acceptor_atom)
 	if d < 1e-12:
 		return 0.0
 	k = 332.06*4.184
 	eps = 4.0
-	return (k * donor_atom.charge * acceptor_atom.charge) / (eps * d)
+	return (k * h_atom.charge * acceptor_atom.charge) / (eps * d)
 
 def specialized_hbond_energy(donor_atom, h_atom, acceptor_atom, atoms, bonds):
 	"""
@@ -62,11 +62,11 @@ def specialized_hbond_energy(donor_atom, h_atom, acceptor_atom, atoms, bonds):
 			c_accept = nbr
 			break
 	if c_accept is None:
-		return simple_hbond_energy(donor_atom, acceptor_atom)
+		return simple_hbond_energy(h_atom, acceptor_atom)
 	rCH = distance(c_accept, h_atom)
 	rCN = distance(c_accept, donor_atom)
 	if min(rON, rOH, rCH, rCN) < 1e-6:
-		return simple_hbond_energy(donor_atom, acceptor_atom)
+		return simple_hbond_energy(h_atom, acceptor_atom)
 
 	factor = 332.06 * 4.184
 	qd = donor_atom.charge
