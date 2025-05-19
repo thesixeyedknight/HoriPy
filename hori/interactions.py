@@ -177,14 +177,14 @@ Interaction = namedtuple('Interaction', [
 		'energy'
 	])
 
-def find_atomic_interactions(distance_map, atoms, bonds, residues, atom_interactions, amber_nonbonded, user_params):
+def find_atomic_interactions(distance_map, atoms, bonds, residues, atom_interactions, amber_nonbonded, user_params, hori_instance=None):
 	for (id1, id2), dist in distance_map.items():
 		a1 = atoms[id1]
 		a2 = atoms[id2]
 
 		itype = classify_interaction(distance_map, a1, a2, dist, atoms, bonds, residues, user_params)
 		if itype:
-			en = compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params)
+			en = compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params, hori_instance=hori_instance)
 			inter = Interaction(a1, a2, dist, itype, en)
 			key = (min(a1.id, a2.id), max(a1.id, a2.id))
 			atom_interactions[key] = inter

@@ -366,3 +366,75 @@ def read_pdb_with_hydrogen(pdb_with_hydrogen):
 	for a_id in atoms:
 		bonds[a_id] = []
 	return atoms, residues, bonds
+
+def atom_dict_to_pdb(atom_dict):
+	"""
+	converts atoms named tuples dicts to pdb text 
+	"""
+	lines = []
+	for atom in atom_dict.values():
+		# Format: ATOM  serial  name resn chain resi   x       y       z
+		line = (
+			"ATOM  "
+			f"{atom.oid:5d} "
+			f"{atom.name:>4s} "
+			f"{atom.resn:>3s} "
+			f"{atom.chain:1s}"
+			f"{atom.resi:4d}    "
+			f"{atom.x:8.3f}{atom.y:8.3f}{atom.z:8.3f}"
+		)
+		lines.append(line)
+	return "\n".join(lines)
+
+
+def prepare_pdb_for_pseudo_surface(hori_atoms_dict):
+	"""
+	Filters the main atom dictionary to include only backbone (N, CA, C, O)
+	and CB atoms (CA for GLY).
+	Returns PDB-formatted lines AND an ordered list of (x,y,z) coordinates for these atoms.
+
+	Args:
+		hori_atoms_dict (dict): The Hori instance's main atoms dictionary
+								(id -> Atom namedtuple).
+
+	Returns:
+		tuple: (pdb_lines_list, ordered_coords_list)
+			   pdb_lines_list (list): PDB-formatted strings for backbone/CB only.
+			   ordered_coords_list (list): List of (x,y,z) tuples for atoms in pdb_lines_list,
+										  matching the order of atoms in the generated PDB string.
+	"""
+	bb_cb_atoms_list_ordered = [] # Store atom objects in a defined order
+
+	# Ensure a consistent order of atoms, e.g., by sorting by original atom ID (oid)
+	# This helps if atom_dict_to_pdb relies on the input dict's iteration order (though ideally it shouldn't)
+	# or if FreeSASA processes atoms in the order they appear in the PDB file.
+	sorted_atom_ids = sorted(hori_atoms_dict.keys(), key=lambda aid: hori_atoms_dict[aid].oid)
+
+	for atom_id in sorted_atom_ids:
+		atom = hori_atoms_dict[atom_id]
+		atom_name = atom.name.strip().upper()
+		res_name = atom.resn.strip().upper()
+
+		is_backbone = atom_name in ["N", "CA", "C", "O"]
+		is_cb = (atom_name == "CB")
+		is_gly_ca_for_cb = (res_name == "GLY" and atom_name == "CA") # Treat GLY's CA as its CB
+
+		if is_backbone or is_cb or is_gly_ca_for_cb:
+			bb_cb_atoms_list_ordered.append(atom)
+
+	if not bb_cb_atoms_list_ordered:
+		print("Warning: No backbone or CB atoms found for pseudo-surface PDB preparation.")
+		return [], []
+
+	# Create a temporary dictionary for atom_dict_to_pdb if it strictly requires a dict format.
+	# The keys for this temp_dict don't have to be original hori_atom_ids,
+	# as long as atom_dict_to_pdb can iterate it.
+	# Usingenumerate ensures a consistent order if atom_dict_to_pdb iterates based on insertion order (Python 3.7+).
+	temp_dict_for_pdb_gen = {i + 1: atom for i, atom in enumerate(bb_cb_atoms_list_ordered)}
+
+	pdb_lines_str = atom_dict_to_pdb(temp_dict_for_pdb_gen) 
+	pdb_lines_list = [line + "\n" for line in pdb_lines_str.split('\n') if line.strip()]
+
+	ordered_coords = [(atom.x, atom.y, atom.z) for atom in bb_cb_atoms_list_ordered]
+
+	return pdb_lines_list, ordered_coords

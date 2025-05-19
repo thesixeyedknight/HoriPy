@@ -1,83 +1,165 @@
 from .classify_interactions import get_ring_data, is_aromatic
 from .math_utils import distance, dist_3d, angle_between_vectors
+from .wisz_utils import calculate_wisz_electrostatic_energy 
+from .pike_nanda_utils import calculate_pike_effective_dielectric_for_interaction 
 import math
 
-def compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params):
+
+def compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params, hori_instance=None):
+	"""
+	hori_instance is required if user_params['dielectric_method'] is 'wisz' or 'pike_nanda'.
+	"""
+	
+	# Wisz method has its own energy calculation for specific types
+	if user_params.get('dielectric_method') == 'wisz':
+		if itype.startswith('hbond') or itype == 'salt_bridge':
+			if hori_instance:
+				return calculate_wisz_electrostatic_energy(a1, a2, itype, dist, hori_instance)
+			else:
+				print(f"Warning: Hori instance not provided for Wisz energy calculation of {itype}. Returning 0.0.")
+				return 0.0
+		# If not handled by Wisz specifically, will fall through to other calculations if applicable
+
+	# For 'bulk' or 'pike_nanda', the specific energy functions below will handle dielectric.
+	# Pass user_params and hori_instance to them.
+
 	if itype.startswith('hbond'):
-		return hbond_energy(a1, a2, atoms, bonds)
+		# Pass 'dist' which is likely the D-A or H-A distance map value.
+		# hbond_energy will need to recalculate specific distances like H-A if 'dist' is D-A.
+		# Or, ensure 'dist' passed here is relevant (e.g., H-A if that's what simple_hbond_energy uses primarily)
+		# For now, we pass `dist` as the general interaction distance from distance_map.
+		return hbond_energy(a1, a2, dist, atoms, bonds, user_params, hori_instance)
 	elif itype == 'salt_bridge':
-		return salt_bridge_energy(a1, a2, dist)
+		return salt_bridge_energy(a1, a2, dist, user_params, hori_instance)
 	elif itype == 'vdw':
-		return lennard_jones(a1, a2, dist, amber_nonbonded)
+		return lennard_jones(a1, a2, dist, amber_nonbonded) # Unaffected by these dielectric models
 	elif itype == 'pi_pi':
 		ring1 = get_ring_data(a1.chain, a1.resi, residues)
 		ring2 = get_ring_data(a2.chain, a2.resi, residues)
-		return pi_pi_energy(ring1, ring2, user_params)
+		return pi_pi_energy(ring1, ring2, user_params) # Generally not using Coulombic dielectric directly
 	elif itype == 'cation_pi':
-		return cation_pi_energy(a1, a2, residues)
+		# 'dist' here is the atom-atom distance from distance_map.
+		# cation_pi_energy calculates centroid-cation distance internally.
+		return cation_pi_energy(a1, a2, dist, residues, user_params, hori_instance)
+	
+	# Handle other interaction types or return 0.0 if not covered
+	# E.g. 'disulfide' currently has no energy. If you add energy, it would be here.
 	return 0.0
 
-def hbond_energy(a1, a2, atoms, bonds):
-	"""
-	If we can do specialized formula => specialized_hbond_energy
-	else => simple_hbond_energy
-	"""
+# Helper: _get_hbond_dielectric (NEW)
+def _get_hbond_dielectric(donor_heavy_atom, acceptor_heavy_atom, user_params, hori_instance):
+	epsilon = user_params.get('bulk_dielectric_value', 4.0) # Start with bulk or default
+
+	if user_params.get('dielectric_method') == 'pike_nanda':
+		pike_params = user_params.get('pike_nanda_params')
+		spatial_grid_data = user_params.get('spatial_grid_data')
+		if hori_instance and pike_params and spatial_grid_data:
+			eff_eps = calculate_pike_effective_dielectric_for_interaction(
+				donor_heavy_atom, acceptor_heavy_atom, hori_instance, pike_params, spatial_grid_data
+			)
+			epsilon = eff_eps
+		else:
+			# This warning might be redundant if analysis.py already fell back user_params['dielectric_method']
+			# but good for direct debugging here.
+			print(f"Warning: Pike & Nanda prerequisites missing for H-bond dielectric. Using epsilon={epsilon}.")
+	# 'bulk' is handled by the initial value of epsilon from user_params.
+	# 'wisz' is handled separately in compute_interaction_energy.
+	return max(1.0, epsilon)
+
+def hbond_energy(a1, a2, dist_map_value, atoms, bonds, user_params, hori_instance=None): # Added dist_map_value
+	# 1. Identify Donor (D), Hydrogen (H), Acceptor (A)
 	if a1.atom_type.startswith('H'):
 		h_atom = a1
-		donor_atom = atoms[bonds[a1.id][0]]  # heavy neighbor
-		acceptor_atom = a2
-	else:
+		acceptor_heavy_atom = a2
+	elif a2.atom_type.startswith('H'):
 		h_atom = a2
-		donor_atom = atoms[bonds[a2.id][0]]
-		acceptor_atom = a1
+		acceptor_heavy_atom = a1
+	else:
+		# This case should ideally not be reached if 'itype' was correctly 'hbond'
+		return 0.0 
 
-	# must be N/O
-	if not (donor_atom.atom_type.startswith('N') or donor_atom.atom_type.startswith('O')):
-		return simple_hbond_energy(h_atom, acceptor_atom)
-	if not (acceptor_atom.atom_type.startswith('N') or acceptor_atom.atom_type.startswith('O')):
-		return simple_hbond_energy(h_atom, acceptor_atom)
+	donor_heavy_atom_ids = bonds.get(h_atom.id, [])
+	if not donor_heavy_atom_ids: return 0.0 # Hydrogen not bonded to anything
+	donor_heavy_atom = atoms[donor_heavy_atom_ids[0]]
 
-	return specialized_hbond_energy(donor_atom, h_atom, acceptor_atom, atoms, bonds)
+	# Check if donor and acceptor are N/O for specialized, otherwise use simple
+	is_special_type = (donor_heavy_atom.atom_type.startswith('N') or donor_heavy_atom.atom_type.startswith('O')) and \
+					  (acceptor_heavy_atom.atom_type.startswith('N') or acceptor_heavy_atom.atom_type.startswith('O'))
 
-def simple_hbond_energy(h_atom, acceptor_atom):
-	d = distance(h_atom, acceptor_atom)
-	if d < 1e-12:
+	# 2. Determine Epsilon (common for both simple and specialized formulas)
+	# The dielectric is primarily influenced by the environment of the heavy atoms.
+	epsilon = _get_hbond_dielectric(donor_heavy_atom, acceptor_heavy_atom, user_params, hori_instance)
+	
+	# 3. Calculate energy using the appropriate formula
+	if is_special_type:
+		# Find C neighbor of acceptor for specialized formula
+		c_acceptor_neighbor = None
+		if acceptor_heavy_atom.id in bonds:
+			for nbr_id in bonds[acceptor_heavy_atom.id]:
+				nbr = atoms.get(nbr_id)
+				if nbr and nbr.atom_type.startswith('C'): # Assuming AMBER 'C', 'CT', 'CA' etc.
+					c_acceptor_neighbor = nbr
+					break
+		return _specialized_hbond_formula(donor_heavy_atom, h_atom, acceptor_heavy_atom, c_acceptor_neighbor, epsilon)
+	else:
+		dist_ha = distance(h_atom, acceptor_heavy_atom) # Calculate H-A distance specifically
+		return _simple_hbond_formula(h_atom, acceptor_heavy_atom, dist_ha, epsilon)
+
+
+def _simple_hbond_formula(h_atom, acceptor_atom, dist_ha, epsilon): # Now takes epsilon
+	# dist_ha is the H-A distance
+	if dist_ha < 1e-12:
 		return 0.0
-	k = 332.06*4.184
-	eps = 4.0
-	return (k * h_atom.charge * acceptor_atom.charge) / (eps * d)
+	k_coulomb = 332.06 * 4.184 # kJ/mol A e^-2
+	# Energy calculation using partial charges of H and Acceptor
+	return (k_coulomb * h_atom.charge * acceptor_atom.charge) / (epsilon * dist_ha)
 
-def specialized_hbond_energy(donor_atom, h_atom, acceptor_atom, atoms, bonds):
-	"""
-	Attempt the 4-distances approach for your custom formula.
-	Otherwise fallback.
-	"""
+
+def _specialized_hbond_formula(donor_atom, h_atom, acceptor_atom, c_acceptor_neighbor, epsilon): # Now takes epsilon
 	rON = distance(donor_atom, acceptor_atom)
-	rOH = distance(acceptor_atom, h_atom)
+	rOH = distance(acceptor_atom, h_atom) # H-A distance
+	
+	if c_acceptor_neighbor is None: # Fallback if C neighbor of acceptor not found
+		# print("Debug: C_acceptor_neighbor not found for specialized H-bond, falling back to simple formula logic with H-A.")
+		return _simple_hbond_formula(h_atom, acceptor_atom, rOH, epsilon)
 
-	c_accept = None
-	for nbr_id in bonds[acceptor_atom.id]:
-		nbr = atoms[nbr_id]
-		if nbr.atom_type.startswith('C'):
-			c_accept = nbr
-			break
-	if c_accept is None:
-		return simple_hbond_energy(h_atom, acceptor_atom)
-	rCH = distance(c_accept, h_atom)
-	rCN = distance(c_accept, donor_atom)
-	if min(rON, rOH, rCH, rCN) < 1e-6:
-		return simple_hbond_energy(h_atom, acceptor_atom)
+	rCH = distance(c_acceptor_neighbor, h_atom)
+	rCN = distance(c_acceptor_neighbor, donor_atom)
 
-	factor = 332.06 * 4.184
-	qd = donor_atom.charge
-	qa = acceptor_atom.charge
-	val = qd * qa * (1.0/rON + 1.0/rCH - 1.0/rOH - 1.0/rCN) * factor
+	if min(rON, rOH, rCH, rCN) < 1e-6: # Avoid division by zero if any critical distance is ~0
+		# Fallback to simple formula if distances are problematic
+		# print("Debug: Problematic distance in specialized H-bond, falling back to simple formula logic with H-A.")
+		return _simple_hbond_formula(h_atom, acceptor_atom, rOH, epsilon)
+
+	# The original formula: qd * qa * (1.0/rON + 1.0/rCH - 1.0/rOH - 1.0/rCN) * factor
+	# Here qd is donor_atom.charge and qa is acceptor_atom.charge. Factor includes epsilon.
+	factor_with_eps = (332.06 * 4.184) / epsilon
+	val = donor_atom.charge * acceptor_atom.charge * \
+		  (1.0/rON + 1.0/rCH - 1.0/rOH - 1.0/rCN) * factor_with_eps
 	return val
 
-def salt_bridge_energy(a1, a2, dist):
-	k = 332.06 * 4.184  # kJ/mol
-	eps = 4.0
-	return (k * a1.charge * a2.charge) / (eps * dist)
+def salt_bridge_energy(a1, a2, dist, user_params, hori_instance=None): # Added user_params, hori_instance
+	k_coulomb = 332.06 * 4.184  # kJ/mol A e^-2
+	epsilon = user_params.get('bulk_dielectric_value', 4.0) # Default to bulk or a fallback
+	if user_params.get('dielectric_method') == 'pike_nanda':
+		pike_params = user_params.get('pike_nanda_params')
+		spatial_grid_data = user_params.get('spatial_grid_data')
+		if hori_instance and pike_params and spatial_grid_data:
+			# For salt bridge, a1 and a2 are the charged atoms defining the interaction
+			eff_eps = calculate_pike_effective_dielectric_for_interaction(
+				a1, a2, hori_instance, pike_params, spatial_grid_data
+			)
+			epsilon = eff_eps
+		else:
+			# analysis.py should have set user_params['dielectric_method'] to 'bulk' if prerequisites failed.
+			# This warning is an additional safeguard or for debugging.
+			print(f"Warning: Pike & Nanda prerequisites missing for salt_bridge ({a1.id}-{a2.id}). Using epsilon={epsilon}.")
+			# Epsilon remains the bulk value if Pike & Nanda setup failed.
+
+	# Note: 'bulk' case is covered by the initial assignment of epsilon using user_params.get('bulk_dielectric_value',...)
+	# 'wisz' case is handled before calling this function.
+	if dist < 1e-6: return 0.0 # Avoid division by zero
+	return (k_coulomb * a1.charge * a2.charge) / (max(1.0, epsilon) * dist)
 
 def lennard_jones(a1, a2, dist, amber_nonbonded):
 	s1, e1 = amber_nonbonded.get(a1.atom_type, (0.34, 0.2))
@@ -115,34 +197,50 @@ def pi_pi_energy(ring1, ring2, user_params):
 
 	return 0.0  # No interaction
 
-def cation_pi_energy(a1, a2, residues):
-	"""
-	Compute cation-π interaction energy.
-	"""
-	# Determine which atom is the cation and which is aromatic
-	if a1.charge > 0.5 and is_aromatic(a2.resn):
-		cation, aromatic = a1, a2
-	elif a2.charge > 0.5 and is_aromatic(a1.resn):
-		cation, aromatic = a2, a1
+def cation_pi_energy(a1, a2, dist_atom_atom, residues, user_params, hori_instance=None): # Added dist_atom_atom, user_params, hori_instance
+	# Determine which atom is the cation and which is representative of the aromatic ring
+	if a1.charge > 0.5 and is_aromatic(a2.resn): # a1 is cation, a2 is on aromatic ring
+		cation_atom, aromatic_ring_atom_ref = a1, a2
+	elif a2.charge > 0.5 and is_aromatic(a1.resn): # a2 is cation, a1 is on aromatic ring
+		cation_atom, aromatic_ring_atom_ref = a2, a1
 	else:
-		return 0.0  # Not a valid cation-π interaction
-	
-	#get ring data 
-	ring = get_ring_data(aromatic.chain, aromatic.resi, residues)
-	if ring is None:
-		return 0.0  # No valid ring data		
-	# get centroid-cation distance
-	cc_dist = dist_3d(ring['centroid'], (cation.x, cation.y, cation.z))
-	
-	# Parameters
-	k_electrostatic = 332.0  # Coulomb constant in kJ/mol·Å·e
-	optimal_distance = 4.0   # Å
-	epsilon = 4.0
-	# Electrostatic energy term
-	energy = -1*(k_electrostatic * cation.charge) / (epsilon * cc_dist)
+		return 0.0 # Not a valid cation-pi pair based on initial check
 
-	# Dampen energy for non-optimal distances
-	if cc_dist > optimal_distance:
-		energy *= math.exp(-(cc_dist - optimal_distance) ** 2 / (2 * 1.5 ** 2))
+	ring_data = get_ring_data(aromatic_ring_atom_ref.chain, aromatic_ring_atom_ref.resi, residues)
+	if ring_data is None:
+		return 0.0
+
+	# Distance for energy formula is cation to ring centroid
+	cc_dist = dist_3d(ring_data['centroid'], (cation_atom.x, cation_atom.y, cation_atom.z))
+	if cc_dist < 1e-6: return 0.0
+
+	epsilon = user_params.get('bulk_dielectric_value', 4.0) # Default to bulk or fallback
+
+	if user_params.get('dielectric_method') == 'pike_nanda':
+		pike_params = user_params.get('pike_nanda_params')
+		spatial_grid_data = user_params.get('spatial_grid_data')
+		if hori_instance and pike_params and spatial_grid_data:
+			# For cation-pi, dielectric is between cation and the pi-system.
+			# We use the initially identified aromatic_ring_atom_ref as the representative
+			# atom from the ring for calculating its local dielectric environment.
+			eff_eps = calculate_pike_effective_dielectric_for_interaction(
+				cation_atom, aromatic_ring_atom_ref, hori_instance, pike_params, spatial_grid_data
+			)
+			epsilon = eff_eps
+		else:
+			print(f"Warning: Pike & Nanda prerequisites missing for cation-pi. Using epsilon={epsilon}.")
+	
+	k_electrostatic = 332.06 * 4.184 # kJ/mol A e^-2
+	optimal_distance_cp = 4.0 # Å, for the damping term, not for dielectric calc
+
+	# Standard simplified electrostatic model for cation-pi
+	# Assumes an effective negative charge on the pi ring interacting with the cation.
+	# The charge of the pi system is effectively -1 (if cation is +ve) or +1 (if cation is -ve) for attraction.
+	effective_pi_charge_sign = -math.copysign(1.0, cation_atom.charge) 
+	energy = (k_electrostatic * cation_atom.charge * effective_pi_charge_sign) / (max(1.0, epsilon) * cc_dist)
+
+	# Dampen energy for non-optimal distances (empirical factor)
+	if cc_dist > optimal_distance_cp:
+		energy *= math.exp(-((cc_dist - optimal_distance_cp)**2) / (2 * 1.5**2)) # Damping factor
 
 	return energy
