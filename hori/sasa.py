@@ -1,16 +1,7 @@
 # hori/sasa.py
 import tempfile
 from .parsing import make_pdb_from_cif
-from .wisz_parameters import REFERENCE_IONIZABLE_GROUP_SASA_EXTENDED
-# It's good practice to import _get_ionizable_group_type_for_sasa if it's used here,
-# or ensure this logic is handled by the caller (Hori class)
-# For now, to keep this function more focused on FreeSASA output,
-# it will return ALL atom SASAs, and the Hori class will filter for ionizable ones.
 import freesasa as fs
-
-# fs.setVerbosity(1) # Or fs.setVerbosity(fs.nowarnings)
-# It's often better to set verbosity once at the application entry point or not at all for a library.
-# If you want to suppress FreeSASA warnings during normal operation:
 fs.setVerbosity(1)
 
 

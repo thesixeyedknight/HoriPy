@@ -1,25 +1,13 @@
 from .classify_interactions import get_ring_data, is_aromatic
 from .math_utils import distance, dist_3d, angle_between_vectors
-from .wisz_utils import calculate_wisz_electrostatic_energy 
 from .pike_nanda_utils import calculate_pike_effective_dielectric_for_interaction 
 import math
 
 
 def compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params, hori_instance=None):
 	"""
-	hori_instance is required if user_params['dielectric_method'] is 'wisz' or 'pike_nanda'.
+	hori_instance is required if user_params['dielectric_method'] is 'pike_nanda'.
 	"""
-	
-	# Wisz method has its own energy calculation for specific types
-	if user_params.get('dielectric_method') == 'wisz':
-		if itype.startswith('hbond') or itype == 'salt_bridge':
-			if hori_instance:
-				return calculate_wisz_electrostatic_energy(a1, a2, itype, dist, hori_instance)
-			else:
-				print(f"Warning: Hori instance not provided for Wisz energy calculation of {itype}. Returning 0.0.")
-				return 0.0
-		# If not handled by Wisz specifically, will fall through to other calculations if applicable
-
 	# For 'bulk' or 'pike_nanda', the specific energy functions below will handle dielectric.
 	# Pass user_params and hori_instance to them.
 
