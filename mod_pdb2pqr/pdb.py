@@ -703,7 +703,7 @@ class ATOM:
             self.name = line[3]
             self.alt_loc = line[4] if line[4] != "." else ""
             self.res_name = line[5]
-            self.chain_id = line[18]
+            self.chain_id = line[6]
             self.res_seq = int(line[8])
             self.ins_code = line[9] if line[9] != "?" else ""
             self.x = float(line[10])

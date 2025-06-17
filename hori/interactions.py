@@ -157,7 +157,7 @@ def build_distance_map_parallel(residues, distance_map, cutoff=7.0, num_cores=8)
 	residue_pairs = []
 	for i, res_rec1 in enumerate(all_residues_list):
 		for res_rec2 in all_residues_list[i+1:]:
-			if res_rec1.chain == res_rec2.chain and abs(res_rec1.resi - res_rec2.resi) < 3:
+			if res_rec1.chain == res_rec2.chain and abs(res_rec1.resi - res_rec2.resi) < 2:
 				continue
 			residue_pairs.append((res_rec1, res_rec2, cutoff, distance))
 	

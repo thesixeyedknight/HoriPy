@@ -60,16 +60,6 @@ def read_cif(lines):
 		if line.startswith('ATOM'):
 			cols = line.split()
 			if cols[-1] == '1':
-				# pdb_line = (
-				# 	"ATOM  {:>5s} {:^4s} {:>3s} {:>1s}{:>4s}    "
-				# 	"{:>8s}{:>8s}{:>8s}{:>6s}{:>6s}          {:>2s}\n"
-				# 	.format(
-				# 		cols[1],
-				# 		cols[3].strip('"'), cols[5], cols[6], cols[8],
-				# 		cols[10], cols[11], cols[12],
-				# 		cols[13], cols[14], cols[2]
-				# 	)
-				# )
 				pdb_for_haad.append(line)
 				chains.add(cols[6])
 	return pdb_for_haad, chains
