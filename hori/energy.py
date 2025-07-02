@@ -145,7 +145,6 @@ def salt_bridge_energy(a1, a2, dist, user_params, hori_instance=None): # Added u
 			# Epsilon remains the bulk value if Pike & Nanda setup failed.
 
 	# Note: 'bulk' case is covered by the initial assignment of epsilon using user_params.get('bulk_dielectric_value',...)
-	# 'wisz' case is handled before calling this function.
 	if dist < 1e-6: return 0.0 # Avoid division by zero
 	return (k_coulomb * a1.charge * a2.charge) / (max(1.0, epsilon) * dist)
 

@@ -146,7 +146,7 @@ def compute_distance_residue_pairs(args):
 				result[key] = dist
 	return result
 
-def build_distance_map_parallel(residues, distance_map, cutoff=7.0, num_cores=8):
+def build_distance_map_parallel(residues, distance_map, cutoff=7.0, num_cores=1):
 	"""
 	Precompute distances for all pairs of atoms across residues using parallel processing.
 	"""
@@ -187,6 +187,9 @@ def find_atomic_interactions(distance_map, atoms, bonds, residues, atom_interact
 			en = compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params, hori_instance=hori_instance)
 			inter = Interaction(a1, a2, dist, itype, en)
 			key = (min(a1.id, a2.id), max(a1.id, a2.id))
+			if itype == 'salt_bridge':
+				if en >= -2.0: #Ensure that salt bridges are above threshold energy
+					continue
 			atom_interactions[key] = inter
 
 def find_residue_interactions(atom_interactions, residue_interactions):

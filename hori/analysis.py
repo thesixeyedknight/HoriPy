@@ -22,7 +22,8 @@ class Hori:
 				 chi_ss_angle_opts=None, chi1_angle_opts=None,
 				 vdw_overlap_tolerance=0.5,
 				 dielectric_method='bulk',
-				 bulk_dielectric = 4.0
+				 bulk_dielectric = 4.0,
+				 num_cores=8
 				 ):
 
 		# ... (parameter storage) ...
@@ -43,6 +44,7 @@ class Hori:
 		self.chi_ss_angle_opts = chi_ss_angle_opts if chi_ss_angle_opts is not None else [(97.0, 30.0), (-87.0, 30.0)]
 		self.chi1_angle_opts = chi1_angle_opts if chi1_angle_opts is not None else [(-60.0, 20.0), (60.0, 20.0), (180.0, 20.0)]
 		self.vdw_overlap_tolerance = vdw_overlap_tolerance
+		self.num_cores = num_cores
 
 		self.atoms = {}
 		self.residues = {}
@@ -154,7 +156,7 @@ class Hori:
 
 
 		# --- Interaction Calculations ---
-		build_distance_map_parallel(self.residues, self.distance_map, cutoff=self.cutoff)
+		build_distance_map_parallel(self.residues, self.distance_map, cutoff=self.cutoff, num_cores=self.num_cores)
 		find_atomic_interactions(self.distance_map, self.atoms, self.bonds, self.residues,
 								 self.atom_interactions, self.amber_nonbonded, self.user_params, self)
 		find_residue_interactions(self.atom_interactions, self.residue_interactions)
