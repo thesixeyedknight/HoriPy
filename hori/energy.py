@@ -30,7 +30,7 @@ def compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, ambe
 		# cation_pi_energy calculates centroid-cation distance internally.
 		return cation_pi_energy(a1, a2, dist, residues, user_params, hori_instance)
 	elif itype == 'disulfide':
-		return 251.0  # Disulfide bond energy is constant in this context
+		return -251.0  # Disulfide bond energy is constant in this context
 	return 0.0
 
 # Helper: _get_hbond_dielectric (NEW)
