@@ -29,9 +29,8 @@ def compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, ambe
 		# 'dist' here is the atom-atom distance from distance_map.
 		# cation_pi_energy calculates centroid-cation distance internally.
 		return cation_pi_energy(a1, a2, dist, residues, user_params, hori_instance)
-	
-	# Handle other interaction types or return 0.0 if not covered
-	# E.g. 'disulfide' currently has no energy. If you add energy, it would be here.
+	elif itype == 'disulfide':
+		return 251.0  # Disulfide bond energy is constant in this context
 	return 0.0
 
 # Helper: _get_hbond_dielectric (NEW)
