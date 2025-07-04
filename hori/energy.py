@@ -148,6 +148,8 @@ def salt_bridge_energy(a1, a2, dist, user_params, hori_instance=None): # Added u
 	return (k_coulomb * a1.charge * a2.charge) / (max(1.0, epsilon) * dist)
 
 def lennard_jones(a1, a2, dist, amber_nonbonded):
+	if dist < 1e-6:
+		return 0.0
 	s1, e1 = amber_nonbonded.get(a1.atom_type, (0.34, 0.2))
 	s2, e2 = amber_nonbonded.get(a2.atom_type, (0.34, 0.2))
 	sigma = 0.5*(s1 + s2)
