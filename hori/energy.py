@@ -187,9 +187,9 @@ def pi_pi_energy(ring1, ring2, user_params):
 
 def cation_pi_energy(a1, a2, dist_atom_atom, residues, user_params, hori_instance=None): # Added dist_atom_atom, user_params, hori_instance
 	# Determine which atom is the cation and which is representative of the aromatic ring
-	if a1.charge > 0.5 and is_aromatic(a2.resn): # a1 is cation, a2 is on aromatic ring
+	if a1.charge > 0.5 and is_aromatic(a2): # a1 is cation, a2 is on aromatic ring
 		cation_atom, aromatic_ring_atom_ref = a1, a2
-	elif a2.charge > 0.5 and is_aromatic(a1.resn): # a2 is cation, a1 is on aromatic ring
+	elif a2.charge > 0.5 and is_aromatic(a1): # a2 is cation, a1 is on aromatic ring
 		cation_atom, aromatic_ring_atom_ref = a2, a1
 	else:
 		return 0.0 # Not a valid cation-pi pair based on initial check

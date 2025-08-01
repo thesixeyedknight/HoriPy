@@ -17,9 +17,11 @@ def recursive_to_dict(item):
 def build_output_data(hori_instance):
 	"""
 	Build a JSON-serializable dictionary for the Hori results.
-	This version omits the atomic_interactions list and stores only residue_interactions.
+	This version stores atomic interactions at the top level for data integrity
+	and uses keys for referencing within residue interactions.
 	"""
 	metadata = {
+		"version": "2.0",
 		"fn": hori_instance.filename,       # shortened key
 		"ft": hori_instance.file_type,
 		"ho": hori_instance.highest_order,
@@ -48,46 +50,29 @@ def build_output_data(hori_instance):
 		residue_dict["aids"] = [atom["id"] for atom in residue_dict.pop("atoms", [])]
 		residues[key_str] = residue_dict
 
+	# build atomic interactions:
+	atomic_interactions = {}
+	for key, interaction in hori_instance.atom_interactions.items():
+		key_str = f"{key[0]}_{key[1]}"
+		atomic_interactions[key_str] = {
+			"a1": interaction.atom1.id,
+			"a2": interaction.atom2.id,
+			"energy": interaction.energy,
+			"type": interaction.int_type,
+			"dist": interaction.distance,
+			"geom_metrics": recursive_to_dict(interaction.geom_metrics)
+		}
 	# Build residue interactions:
-	# For each residue pair, process its atomic interactions.
 	residue_interactions = {}
-	for key, inter in hori_instance.residue_interactions.items():
-		key_str = f"{key[0][0]}_{key[0][1]}__{key[1][0]}_{key[1][1]}"
-		inter_dict = recursive_to_dict(inter)
-		atomic_list = inter_dict.get("atomic_interactions", [])
-		
-		# Build a reduced list of atomic interactions, keeping only essential keys.
-		reduced_atomic_list = []
-		total_energy = 0.0
-		for a_int in atomic_list:
-			# Depending on how the atomic interaction was stored,
-			# it might already be reduced (with keys "atom1_id" etc.) or still have full dicts.
-			# We check and extract the id accordingly.
-			if isinstance(a_int.get("atom1"), dict):
-				a1_id = a_int["atom1"].get("id")
-			else:
-				a1_id = a_int.get("atom1_id")
-			if isinstance(a_int.get("atom2"), dict):
-				a2_id = a_int["atom2"].get("id")
-			else:
-				a2_id = a_int.get("atom2_id")
-			# Create a reduced dictionary.
-			reduced = {
-				"a1": a1_id,
-				"a2": a2_id,
-				"energy": a_int.get("energy"),
-				"type": a_int.get("int_type"),
-				"dist": a_int.get("distance")
-			}
-			# Sum up the energies (if present)
-			if reduced["energy"] is not None:
-				total_energy += reduced["energy"]
-			reduced_atomic_list.append(reduced)
-		
-		# Store the reduced list along with an aggregate energy value.
-		inter_dict["atomic_interactions"] = reduced_atomic_list
-		inter_dict["total_energy"] = total_energy
-		residue_interactions[key_str] = inter_dict
+	for res_pair_key, res_inter_data in hori_instance.residue_interactions.items():
+		key_str = f"{res_pair_key[0][0]}_{res_pair_key[0][1]}__{res_pair_key[1][0]}_{res_pair_key[1][1]}"
+		atomic_keys = res_inter_data["atomic_interactions"]
+		total_energy = sum(hori_instance.atom_interactions[key].energy or 0 for key in atomic_keys)
+		residue_interactions[key_str] = {
+			"atomic_interaction_keys": [f"{k[0]}_{k[1]}" for k in atomic_keys],
+			"int_types": list(res_inter_data["int_types"]),
+			"total_energy": total_energy
+		}
 
 	# Higher-order interactions: convert cliques (tuples) to lists.
 	higher_order_interactions = {}
@@ -98,6 +83,7 @@ def build_output_data(hori_instance):
 		"meta": metadata,
 		"atoms": atoms,
 		"residues": residues,
+		"atomic_interactions": atomic_interactions,
 		"residue_interactions": residue_interactions,
 		"higher_order_interactions": higher_order_interactions
 	}
@@ -108,8 +94,3 @@ def save_output(hori_instance, output_filename):
 	with open(output_filename, 'w') as f:
 		json.dump(data, f, indent=2)
 	print(f"Output successfully saved to {output_filename}")
-
-# if __name__ == "__main__":
-# 	from hori.analysis import Hori
-# 	h = Hori(filename='examples/1a2p.cif', pH=13.0)
-# 	save_output(h, 'analysis_output.json')

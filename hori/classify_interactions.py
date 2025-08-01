@@ -4,28 +4,41 @@ from .ramachandran import calculate_dihedral
 
 def classify_interaction(distance_map, a1, a2, dist, atoms, bonds, residues, user_params):
 	# 0) disulfide bond
-	if is_disulfide_bond(a1, a2, dist, residues, user_params):
-		return 'disulfide'
+	disulfide_details = is_disulfide_bond(a1, a2, dist, residues, user_params)
+	if disulfide_details.pop('is_disulfide', False):
+		disulfide_details['type'] = 'disulfide'
+		return disulfide_details
+
 	# 1) H-bond
-	bool_is_h_bond, dist_h_bond = is_hbond(distance_map, a1, a2, atoms, bonds, user_params)
-	if bool_is_h_bond:
-		if dist_h_bond < 2.5:
-			return 'hbond_strong'
+	hbond_details = is_hbond(distance_map, a1, a2, atoms, bonds, user_params)
+	if hbond_details.pop('is_hbond', False):
+		if hbond_details['d_a_dist'] < 2.5:
+			hbond_details['type'] = 'hbond_strong'
 		else:
-			return 'hbond_weak'
+			hbond_details['type'] = 'hbond_weak'
+		return hbond_details
+
 	# 2) Salt bridge
 	if dist <= user_params['salt_bridge_dist'] and (a1.charge * a2.charge < 0.0):
-		return 'salt_bridge'
+		return {'type': 'salt_bridge'}
+
 	# 3) pi-pi / cation-pi
-	if is_aromatic(a1.resn) and is_aromatic(a2.resn):
-		if is_pi_pi(a1, a2, residues, user_params):
-			return 'pi_pi'
-	elif is_cation_pi(a1, a2, residues, user_params):
-		return 'cation_pi'
+	if is_aromatic(a1) and is_aromatic(a2):
+		pi_pi_details = is_pi_pi(a1, a2, residues, user_params)
+		if pi_pi_details.pop('is_pi_pi', False):
+			pi_pi_details['type'] = 'pi_pi'
+			return pi_pi_details
+	else: # Use else to avoid re-checking aromaticity
+		cation_pi_details = is_cation_pi(a1, a2, residues, user_params)
+		if cation_pi_details.pop('is_cation_pi', False):
+			cation_pi_details['type'] = 'cation_pi'
+			return cation_pi_details
+			
 	# 4) vdw
 	if is_van_der_waals(a1, a2, dist, bonds, user_params):
-		return 'vdw'
-	#none of the above
+		return {'type': 'vdw'}
+		
+	# none of the above
 	return None
 
 def is_van_der_waals(a1, a2, dist, bonds, user_params):
@@ -87,27 +100,28 @@ def _check_angle_within_options(angle, angle_options):
 
 def is_disulfide_bond(sg1_atom, sg2_atom, dist, all_residues_dict, user_params):
 	"""
-	Check for disulfide bond based on distance and dihedral angles.
+	Check for disulfide bond based on distance and dihedral angles, return geometric metrics if it is.
 	sg1_atom, sg2_atom: The two sulfur atoms.
 	all_residues_dict: The main dictionary mapping (chain, resi) to ResidueRecord.
 	"""
+	result = {'is_disulfide': False}
 	# 1. Basic atom and residue type check
 	if not (sg1_atom.resn == 'CYS' and sg1_atom.name == 'SG' and \
 			sg2_atom.resn == 'CYS' and sg2_atom.name == 'SG'):
-		return False
+		return result
 
 	# 2. S-S Distance check
 	min_dist = user_params.get('disulfide_min_dist', 1.8)
 	max_dist = user_params.get('disulfide_max_dist', 2.2)
 	if not (min_dist <= dist <= max_dist):
-		return False
+		return result
 
 	# Retrieve ResidueRecords for both Cysteines
 	res1_rec = all_residues_dict.get((sg1_atom.chain, sg1_atom.resi))
 	res2_rec = all_residues_dict.get((sg2_atom.chain, sg2_atom.resi))
 
 	if not res1_rec or not res2_rec:
-		return False # Should not happen if sg atoms are valid
+		return result # Should not happen if sg atoms are valid
 
 	# Get necessary atoms for Cys1
 	c1_cb = _get_atom_from_record(res1_rec, 'CB')
@@ -121,7 +135,7 @@ def is_disulfide_bond(sg1_atom, sg2_atom, dist, all_residues_dict, user_params):
 
 	if not (c1_cb and c1_ca and c1_n and c2_cb and c2_ca and c2_n):
 		print(f"Warning: Missing CB/CA/N for disulfide dihedral check between {sg1_atom.chain}{sg1_atom.resi} and {sg2_atom.chain}{sg2_atom.resi}")
-		return False # Cannot calculate dihedrals
+		return result # Cannot calculate dihedrals
 
 	# Prepare coordinates for dihedral calculation
 	p_c1_n  = (c1_n.x, c1_n.y, c1_n.z)
@@ -138,48 +152,56 @@ def is_disulfide_bond(sg1_atom, sg2_atom, dist, all_residues_dict, user_params):
 	chi_ss_val = calculate_dihedral(p_c1_cb, p_sg1, p_sg2, p_c2_cb)
 	chi_ss_options = user_params.get('chi_ss_angle_opts', [(97.0, 30.0), (-87.0, 30.0)])
 	if not _check_angle_within_options(chi_ss_val, chi_ss_options):
-		return False
+		return result
 
 	# 4. chi1 dihedral angle (N-CA-CB-SG) for Cys1
 	chi1_cys1_val = calculate_dihedral(p_c1_n, p_c1_ca, p_c1_cb, p_sg1)
 	chi1_options = user_params.get('chi1_angle_opts', [(-60.0, 20.0), (60.0, 20.0), (180.0, 20.0)])
 	if not _check_angle_within_options(chi1_cys1_val, chi1_options):
-		return False
+		return result
 
 	# 5. chi1 dihedral angle (N-CA-CB-SG) for Cys2
 	chi1_cys2_val = calculate_dihedral(p_c2_n, p_c2_ca, p_c2_cb, p_sg2)
 	if not _check_angle_within_options(chi1_cys2_val, chi1_options):
-		return False
+		return result
+	
+	# If all checks passed, it's a disulfide bond
+	result['is_disulfide'] = True
+	result['dihedral_chi_ss'] = chi_ss_val
+	result['dihedral_chi1_cys1'] = chi1_cys1_val
+	result['dihedral_chi1_cys2'] = chi1_cys2_val
 
-	return True # All criteria met
+	return result
 
 def is_hbond(distance_map, at1, at2, atoms, bonds, user_params):
 	"""
-	check if at1 and at2 form a hydrogen bond
+	check if at1 and at2 form a hydrogen bond and returns metric data if they do.
 	"""
+
+	result = {'is_hbond': False}
 	# which is hydrogen?
 	if at1.atom_type.startswith('H'):
 		h_atom, other = at1, at2
 	elif at2.atom_type.startswith('H'):
 		h_atom, other = at2, at1
 	else:
-		return False, None
+		return result
 
 	# acceptor must be O or N
 	if not (other.atom_type.startswith('O') or other.atom_type.startswith('N')):
-		return False, None
+		return result
 
 	# find donor heavy atom
 	donors = bonds[h_atom.id]
 	if len(donors) != 1:
-		return False, None
+		return result
 	donor_atom = atoms[donors[0]]
 	if donor_atom == other:
-		return False, None #hydrogen cannot bond to back to the donor
+		return result #hydrogen cannot bond to back to the donor
 	
 	#donor atom check
 	if not (donor_atom.atom_type.startswith('O') or donor_atom.atom_type.startswith('N')):
-		return False, None #not h bond if donor is not O or N
+		return result #not h bond if donor is not O or N
 
 	# distance check
 	d_a_dist_key = (min(donor_atom.id, other.id), max(donor_atom.id, other.id))
@@ -187,50 +209,79 @@ def is_hbond(distance_map, at1, at2, atoms, bonds, user_params):
 	h_a_dist_key = (min(h_atom.id, other.id), max(h_atom.id, other.id))
 	h_a_dist = distance_map.get(h_a_dist_key, None)
 	if d_a_dist is None or d_a_dist > user_params['d_a_dist'] or h_a_dist is None or h_a_dist > user_params['h_a_dist']:
-		return False, None
+		return result # not a hydrogen bond if distances are too large
 
 	# angle check
 	dh_vec = (h_atom.x - donor_atom.x, h_atom.y - donor_atom.y, h_atom.z - donor_atom.z)
 	ah_vec = (h_atom.x - other.x, h_atom.y - other.y, h_atom.z - other.z)
 	ang = angle_between_vectors(dh_vec, ah_vec)
-	return (ang >= user_params['dha_angle']), d_a_dist
 
-def is_aromatic(resn):
-	return resn.upper() in ('PHE', 'TYR', 'TRP', 'HIS')
+	if ang >= user_params['dha_angle']:
+		result['is_hbond'] = True
+		result['d_a_dist'] = d_a_dist
+		result['dha_angle'] = ang
+		return result
+	else:
+		return result
+
+def is_aromatic(atom):
+	""" Check if the atom is one of the aromatic rings atom."""
+	RING_DEFS = {'PHE': ['CG','CD1','CD2','CE1','CE2','CZ'],
+		'TYR': ['CG','CD1','CD2','CE1','CE2','CZ'],
+		'HIS': ['CG','ND1','CD2','CE1','NE2'],
+		'TRP': ['CG','CD1','NE1','CE2','CD2','CE3','CZ2','CH2','CZ3']}
+	resn = atom.resn.upper()
+	if resn not in RING_DEFS:
+		return False
+	return atom.name.upper() in RING_DEFS[resn]
 
 def is_pi_pi(a1, a2, residues, user_params):
+	""" Check if a1 and a2 are aromatic residues forming a pi-pi interaction."""
+	result = {'is_pi_pi': False}
 	ring1 = get_ring_data(a1.chain, a1.resi, residues)
 	ring2 = get_ring_data(a2.chain, a2.resi, residues)
 	if (ring1 is None) or (ring2 is None):
-		return False
+		return result
 	d = dist_3d(ring1['centroid'], ring2['centroid'])
 	if d > user_params['pi_pi_dist']:
-		return False
+		return result
 	angle = angle_between_vectors(ring1['normal'], ring2['normal'])
 	# parallel or stacked
-	if angle < user_params['pi_pi_angle'] or abs(180.0 - angle) < user_params['pi_pi_angle']:
-		return True
-	if (90.0-user_params['pi_pi_angle']) < angle < (90.0+user_params['pi_pi_angle']):
-		return True 
-	return False
+	is_parallel = angle < user_params['pi_pi_angle'] or abs(180.0 - angle) < user_params['pi_pi_angle']
+	is_t_shaped = (90.0 - user_params['pi_pi_angle']) < angle < (90.0 + user_params['pi_pi_angle'])
+	if is_parallel or is_t_shaped:
+		result['is_pi_pi'] = True
+		result['centroid_dist'] = d
+		result['plane_angle'] = angle
+		return result
+	# not a pi-pi interaction
+	return result
 
 def is_cation_pi(a1, a2, residues, user_params):
-	# if dist > 6.0:
-	# 	return False
-	# check cation
-	if a1.charge > 0.5 and is_aromatic(a2.resn):
-		ring = get_ring_data(a2.chain, a2.resi, residues)
-		if ring is None:
-			return False
-		d2 = dist_3d((a1.x, a1.y, a1.z), ring['centroid'])
-		return (d2 < user_params['cation_pi_dist'])
-	elif a2.charge > 0.5 and is_aromatic(a1.resn):
-		ring = get_ring_data(a1.chain, a1.resi, residues)
-		if ring is None:
-			return False
-		d2 = dist_3d((a2.x, a2.y, a2.z), ring['centroid'])
-		return (d2 < user_params['cation_pi_dist'])
-	return False
+	"""
+	Check if a cation (positively charged atom) is interacting with an aromatic ring.
+	"""
+	result = {'is_cation_pi': False}
+
+	cation_atom, aromatic_res_atom = (a1, a2) if a1.charge > 0.5 and is_aromatic(a2) else \
+									 (a2, a1) if a2.charge > 0.5 and is_aromatic(a1) else \
+									 (None, None)
+	if not cation_atom:
+		return result
+	
+	ring = get_ring_data(aromatic_res_atom.chain, aromatic_res_atom.resi, residues)
+	if ring is None:
+		return result
+	
+	cation_coords = (cation_atom.x, cation_atom.y, cation_atom.z)
+	dist_to_centroid = dist_3d(cation_coords, ring['centroid'])
+
+	if dist_to_centroid < user_params['cation_pi_dist']:
+		result['is_cation_pi'] = True
+		result['cation_centroid_dist'] = dist_to_centroid
+		return result
+	
+	return result
 
 def get_ring_data(chain, resi, residues):
 	"""

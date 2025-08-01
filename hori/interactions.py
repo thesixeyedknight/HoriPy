@@ -4,7 +4,6 @@ from collections import namedtuple
 from .classify_interactions import classify_interaction
 from .energy import compute_interaction_energy
 
-
 def populate_bonds(residues, bonds):
 	"""
 	Build the bond map for each residue using the residue_hydrogen_mapping and
@@ -174,7 +173,8 @@ Interaction = namedtuple('Interaction', [
 		'atom1', 'atom2',
 		'distance',
 		'int_type',
-		'energy'
+		'energy',
+		'geom_metrics'
 	])
 
 def find_atomic_interactions(distance_map, atoms, bonds, residues, atom_interactions, amber_nonbonded, user_params, hori_instance=None):
@@ -182,13 +182,15 @@ def find_atomic_interactions(distance_map, atoms, bonds, residues, atom_interact
 		a1 = atoms[id1]
 		a2 = atoms[id2]
 
-		itype = classify_interaction(distance_map, a1, a2, dist, atoms, bonds, residues, user_params)
-		if itype:
+		interaction_details = classify_interaction(distance_map, a1, a2, dist, atoms, bonds, residues, user_params)
+		if interaction_details:
+			itype = interaction_details.pop('type')
+			geom_metrics = interaction_details
 			en = compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params, hori_instance=hori_instance)
-			inter = Interaction(a1, a2, dist, itype, en)
+			inter = Interaction(a1, a2, dist, itype, en, geom_metrics)
 			key = (min(a1.id, a2.id), max(a1.id, a2.id))
 			if itype == 'salt_bridge':
-				if en >= -2.0: #Ensure that salt bridges are above threshold energy
+				if en > -2.0: #Ensure that salt bridges are above threshold energy
 					continue
 			atom_interactions[key] = inter
 
@@ -197,7 +199,7 @@ def find_residue_interactions(atom_interactions, residue_interactions):
 	From atomic interactions, find residue-residue pairwise interactions.
 	Store residues and corresponding atomic interactions.
 	"""
-	for _, interaction in atom_interactions.items():
+	for key, interaction in atom_interactions.items():
 		res1 = (interaction.atom1.chain, interaction.atom1.resi)
 		res2 = (interaction.atom2.chain, interaction.atom2.resi)
 		if res1 == res2:
@@ -212,5 +214,5 @@ def find_residue_interactions(atom_interactions, residue_interactions):
 				"int_types": set(),
 			}
 		
-		residue_interactions[res_pair]["atomic_interactions"].append(interaction)
+		residue_interactions[res_pair]["atomic_interactions"].append(key)
 		residue_interactions[res_pair]["int_types"].add(interaction.int_type)
