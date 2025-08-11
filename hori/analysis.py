@@ -9,7 +9,7 @@ from hori.sasa import compute_sasa_data
 from hori.higher_order import parallel_find_higher_order_interactions
 from hori.amber_parser import parse_amber_atomtypes, parse_amber_ffnonbonded
 from hori.ramachandran import compute_ramachandran_angles
-
+from hori.kbp_tools import KBPManager # for knowledge based potentials
 #for pike method
 from hori.pike_nanda_parameters import PIKE_NANDA_ALL_PARAMS
 from hori.spatial_utils import create_spatial_grid
@@ -18,12 +18,14 @@ class Hori:
 	def __init__(self, filename, file_type=None, highest_order='converge',
 				 pH=7.0, cutoff=7.0, d_a_dist=3.9, h_a_dist=2.5, dha_angle=90.0,
 				 salt_bridge_dist=4.0, pi_pi_dist=6.0, cation_pi_dist=6.0,
-				 pi_pi_angle=30.0, disulfide_min_dist=1.8, disulfide_max_dist=2.2,
+				 pi_pi_angle=30.0, disulfide_min_dist=1.7, disulfide_max_dist=2.4,
 				 chi_ss_angle_opts=None, chi1_angle_opts=None,
 				 vdw_overlap_tolerance=0.5,
 				 dielectric_method='bulk',
 				 bulk_dielectric = 4.0,
-				 num_cores=8
+				 num_cores=8,
+				 use_kbp=True,
+				 kbp_file_path=None
 				 ):
 
 		# ... (parameter storage) ...
@@ -42,7 +44,7 @@ class Hori:
 		self.disulfide_min_dist = disulfide_min_dist
 		self.disulfide_max_dist = disulfide_max_dist
 		self.chi_ss_angle_opts = chi_ss_angle_opts if chi_ss_angle_opts is not None else [(97.0, 30.0), (-87.0, 30.0)]
-		self.chi1_angle_opts = chi1_angle_opts if chi1_angle_opts is not None else [(-60.0, 20.0), (60.0, 20.0), (180.0, 20.0)]
+		self.chi1_angle_opts = chi1_angle_opts if chi1_angle_opts is not None else [(-60.0, 35.0), (60.0, 35.0), (180.0, 35.0)]
 		self.vdw_overlap_tolerance = vdw_overlap_tolerance
 		self.num_cores = num_cores
 
@@ -74,6 +76,10 @@ class Hori:
 				print("Error: Could not import Pike & Nanda parameters. Defaulting dielectric method to 'bulk'.")
 				self.dielectric_method = 'bulk'
 				self.pike_nanda_params = None
+
+		self.kbp_manager = None
+		if use_kbp:
+			self.kbp_manager = KBPManager(kbp_file_path)
 
 		# --- Workflow ---
 		parse_amber_atomtypes(self.amber_atomtypes)
@@ -158,7 +164,7 @@ class Hori:
 		# --- Interaction Calculations ---
 		build_distance_map_parallel(self.residues, self.distance_map, cutoff=self.cutoff, num_cores=self.num_cores)
 		find_atomic_interactions(self.distance_map, self.atoms, self.bonds, self.residues,
-								 self.atom_interactions, self.amber_nonbonded, self.user_params, self)
+								 self.atom_interactions, self.amber_nonbonded, self.user_params, self, kbp_manager=self.kbp_manager)
 		find_residue_interactions(self.atom_interactions, self.residue_interactions)
 
 		self.higher_order_interactions = parallel_find_higher_order_interactions(

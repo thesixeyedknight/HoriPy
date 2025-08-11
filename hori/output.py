@@ -58,6 +58,7 @@ def build_output_data(hori_instance):
 			"a1": interaction.atom1.id,
 			"a2": interaction.atom2.id,
 			"energy": interaction.energy,
+			"kbp_energy": interaction.kbp_energy,
 			"type": interaction.int_type,
 			"dist": interaction.distance,
 			"geom_metrics": recursive_to_dict(interaction.geom_metrics)

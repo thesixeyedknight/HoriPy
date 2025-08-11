@@ -20,7 +20,7 @@ def classify_interaction(distance_map, a1, a2, dist, atoms, bonds, residues, use
 
 	# 2) Salt bridge
 	if dist <= user_params['salt_bridge_dist'] and (a1.charge * a2.charge < 0.0):
-		return {'type': 'salt_bridge'}
+		return {'type': 'salt_bridge', 'distance': dist}
 
 	# 3) pi-pi / cation-pi
 	if is_aromatic(a1) and is_aromatic(a2):
@@ -35,9 +35,11 @@ def classify_interaction(distance_map, a1, a2, dist, atoms, bonds, residues, use
 			return cation_pi_details
 			
 	# 4) vdw
-	if is_van_der_waals(a1, a2, dist, bonds, user_params):
-		return {'type': 'vdw'}
-		
+	vdw_details = is_van_der_waals(a1, a2, dist, bonds, user_params)
+	if vdw_details.pop('is_vdw', False):
+		vdw_details['type'] = 'vdw'
+		return vdw_details
+
 	# none of the above
 	return None
 
@@ -56,19 +58,26 @@ def is_van_der_waals(a1, a2, dist, bonds, user_params):
 	Returns:
 		bool: True if it's a Van der Waals interaction, False otherwise.
 	"""
+	result = {'is_vdw': False}
 	vdw_tol = user_params.get('vdw_overlap_tolerance', 0.5)
 
 	# Ensure radii are valid numbers before using them
 	if not (isinstance(a1.radius, (float, int)) and isinstance(a2.radius, (float, int))):
-		return False # Cannot determine vdW interaction without valid radii
+		return result # Cannot determine vdW interaction without valid radii
 
-	if dist < (a1.radius + a2.radius + vdw_tol):
+	sum_radii = a1.radius + a2.radius
+	if dist < (sum_radii + vdw_tol):
 		# Check that these atoms are not directly covalently bonded
 		# (disulfide is handled separately; this is for other potential direct bonds)
 		if bonds and a1.id in bonds and a2.id in bonds[a1.id]:
-			return False # It's a direct covalent bond, not primarily a vdW interaction
-		return True
-	return False
+			return result # It's a direct covalent bond, not primarily a vdW interaction
+		result['is_vdw'] = True
+		if sum_radii > 0:
+			result['rred'] = dist/sum_radii
+		else:
+			result['rred'] = 0
+		return result
+	return result
 
 def _get_atom_from_record(residue_record, atom_name):
 	"""Helper to get a specific atom from a ResidueRecord's atom list."""
@@ -111,8 +120,8 @@ def is_disulfide_bond(sg1_atom, sg2_atom, dist, all_residues_dict, user_params):
 		return result
 
 	# 2. S-S Distance check
-	min_dist = user_params.get('disulfide_min_dist', 1.8)
-	max_dist = user_params.get('disulfide_max_dist', 2.2)
+	min_dist = user_params.get('disulfide_min_dist', 1.7)
+	max_dist = user_params.get('disulfide_max_dist', 2.4)
 	if not (min_dist <= dist <= max_dist):
 		return result
 
@@ -134,7 +143,6 @@ def is_disulfide_bond(sg1_atom, sg2_atom, dist, all_residues_dict, user_params):
 	c2_n = _get_atom_from_record(res2_rec, 'N')
 
 	if not (c1_cb and c1_ca and c1_n and c2_cb and c2_ca and c2_n):
-		print(f"Warning: Missing CB/CA/N for disulfide dihedral check between {sg1_atom.chain}{sg1_atom.resi} and {sg2_atom.chain}{sg2_atom.resi}")
 		return result # Cannot calculate dihedrals
 
 	# Prepare coordinates for dihedral calculation
@@ -156,7 +164,7 @@ def is_disulfide_bond(sg1_atom, sg2_atom, dist, all_residues_dict, user_params):
 
 	# 4. chi1 dihedral angle (N-CA-CB-SG) for Cys1
 	chi1_cys1_val = calculate_dihedral(p_c1_n, p_c1_ca, p_c1_cb, p_sg1)
-	chi1_options = user_params.get('chi1_angle_opts', [(-60.0, 20.0), (60.0, 20.0), (180.0, 20.0)])
+	chi1_options = user_params.get('chi1_angle_opts', [(-60.0, 35.0), (60.0, 35.0), (180.0, 35.0)])
 	if not _check_angle_within_options(chi1_cys1_val, chi1_options):
 		return result
 

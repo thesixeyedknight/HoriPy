@@ -4,34 +4,69 @@ from .pike_nanda_utils import calculate_pike_effective_dielectric_for_interactio
 import math
 
 
-def compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params, hori_instance=None):
+def get_kbp_energy(interaction_type, geom_metrics, kbp_manager):
+	"""
+	Calculates the total KBP energy from geometric metrics.
+	"""
+	if not kbp_manager or not kbp_manager.potentials:
+		return None
+
+	total_kbp_energy = 0.0
+	energy_components = 0
+
+	geom_to_kbp_map = {
+		'hbond': {'d_a_dist': 'distance', 'dha_angle': 'angle'},
+		'pi_pi': {'centroid_dist': 'distance', 'plane_angle': 'angle'},
+		'cation_pi': {'cation_centroid_dist': 'distance'},
+		'disulfide': {'dihedral_chi_ss': 'chi_ss', 'dihedral_chi1_cys1': 'chi1_cys1', 'dihedral_chi1_cys2': 'chi1_cys2'},
+		'salt_bridge': {'distance': 'distance'},
+		'vdw': {'rred': 'rred'}
+	}
+
+	if 'hbond' in interaction_type:
+		interaction_type = 'hbond'  # Normalize to 'hbond' for KBP lookup
+	if interaction_type not in geom_to_kbp_map:
+		return None
+
+	metric_map = geom_to_kbp_map[interaction_type]
+	for metric_name, kbp_geom_type in metric_map.items():
+		if metric_name in geom_metrics:
+			value = geom_metrics[metric_name]
+			potential = kbp_manager.get_potential(interaction_type, kbp_geom_type, value)
+			if potential is not None:
+				total_kbp_energy += potential
+				energy_components += 1
+
+	return total_kbp_energy if energy_components > 0 else None
+
+def compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params, hori_instance=None, kbp_manager=None, geom_metrics=None):
 	"""
 	hori_instance is required if user_params['dielectric_method'] is 'pike_nanda'.
 	"""
-	# For 'bulk' or 'pike_nanda', the specific energy functions below will handle dielectric.
-	# Pass user_params and hori_instance to them.
+
+	phys_chem_energy = 0.0
+	kbp_energy = None
 
 	if itype.startswith('hbond'):
-		# Pass 'dist' which is likely the D-A or H-A distance map value.
-		# hbond_energy will need to recalculate specific distances like H-A if 'dist' is D-A.
-		# Or, ensure 'dist' passed here is relevant (e.g., H-A if that's what simple_hbond_energy uses primarily)
-		# For now, we pass `dist` as the general interaction distance from distance_map.
-		return hbond_energy(a1, a2, dist, atoms, bonds, user_params, hori_instance)
+		phys_chem_energy = hbond_energy(a1, a2, dist, atoms, bonds, user_params, hori_instance)
 	elif itype == 'salt_bridge':
-		return salt_bridge_energy(a1, a2, dist, user_params, hori_instance)
+		phys_chem_energy = salt_bridge_energy(a1, a2, dist, user_params, hori_instance)
 	elif itype == 'vdw':
-		return lennard_jones(a1, a2, dist, amber_nonbonded) # Unaffected by these dielectric models
+		phys_chem_energy = lennard_jones(a1, a2, dist, amber_nonbonded)
 	elif itype == 'pi_pi':
 		ring1 = get_ring_data(a1.chain, a1.resi, residues)
 		ring2 = get_ring_data(a2.chain, a2.resi, residues)
-		return pi_pi_energy(ring1, ring2, user_params) # Generally not using Coulombic dielectric directly
+		phys_chem_energy = pi_pi_energy(ring1, ring2, user_params)
 	elif itype == 'cation_pi':
-		# 'dist' here is the atom-atom distance from distance_map.
-		# cation_pi_energy calculates centroid-cation distance internally.
-		return cation_pi_energy(a1, a2, dist, residues, user_params, hori_instance)
+		phys_chem_energy = cation_pi_energy(a1, a2, dist, residues, user_params, hori_instance)
 	elif itype == 'disulfide':
-		return -251.0  # Disulfide bond energy is constant in this context
-	return 0.0
+		phys_chem_energy = -251.0
+
+	if kbp_manager and geom_metrics:
+		#interaction_details = hori_instance.atom_interactions.get((min(a1.id, a2.id), max(a1.id, a2.id)))
+		#if interaction_details:
+		kbp_energy = get_kbp_energy(itype, geom_metrics, kbp_manager)
+	return phys_chem_energy, kbp_energy
 
 # Helper: _get_hbond_dielectric (NEW)
 def _get_hbond_dielectric(donor_heavy_atom, acceptor_heavy_atom, user_params, hori_instance):
