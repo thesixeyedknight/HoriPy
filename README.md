@@ -59,6 +59,6 @@ python -m unittest discover tests
 
 ## License
 
-- The majority of this repository is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+- The majority of this repository is licensed under the GNU GPLv3. See the [LICENSE](./LICENSE) file for details.
 - The code in the `mod_pdb2pqr` directory is based on [pdb2pqr](https://github.com/Electrostatics/pdb2pqr), which is distributed under its original license. See the [license file in that directory](./mod_pdb2pqr/LICENCE) for more information.
 
