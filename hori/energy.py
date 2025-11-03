@@ -192,7 +192,8 @@ def lennard_jones(a1, a2, dist, amber_nonbonded):
 	sr = sigma/dist
 	sr6 = sr**6
 	sr12 = sr6**2
-	return 4.0*epsilon*(sr12 - sr6)
+	lj_kcal = 4.0 * epsilon * (sr12 - sr6)
+	return lj_kcal * 4.184  # Convert to kJ/mol
 
 def pi_pi_energy(ring1, ring2, user_params):
 	"""
