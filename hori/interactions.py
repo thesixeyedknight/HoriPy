@@ -3,6 +3,11 @@ from multiprocessing import Pool
 from collections import namedtuple
 from .classify_interactions import classify_interaction
 from .energy import compute_interaction_energy
+import sys
+import dataclasses
+from . import nis
+from .nis import HoriNIS
+from typing import Optional, Dict, Any
 
 def populate_bonds(residues, bonds):
 	"""
@@ -175,10 +180,16 @@ Interaction = namedtuple('Interaction', [
 		'int_type',
 		'energy',
 		'kbp_energy',
-		'geom_metrics'
+		'geom_metrics',
+		'nis'
 	])
 
 def find_atomic_interactions(distance_map, atoms, bonds, residues, atom_interactions, amber_nonbonded, user_params, hori_instance=None, kbp_manager=None):
+	
+	pdb_id = "unknown_pdb"
+	if hori_instance:
+		pdb_id = getattr(hori_instance, 'pdb_id', hori_instance.filename)
+
 	for (id1, id2), dist in distance_map.items():
 		a1 = atoms[id1]
 		a2 = atoms[id2]
@@ -187,12 +198,25 @@ def find_atomic_interactions(distance_map, atoms, bonds, residues, atom_interact
 		if interaction_details:
 			itype = interaction_details.pop('type')
 			geom_metrics = interaction_details
+			
 			en, kbp_en = compute_interaction_energy(a1, a2, dist, itype, residues, atoms, bonds, amber_nonbonded, user_params, hori_instance=hori_instance, kbp_manager=kbp_manager, geom_metrics=geom_metrics)
-			inter = Interaction(a1, a2, dist, itype, en, kbp_en, geom_metrics)
-			key = (min(a1.id, a2.id), max(a1.id, a2.id))
 			if itype == 'salt_bridge':
 				if en > -2.0: #Ensure that salt bridges are above threshold energy
 					continue
+			
+			nis_obj = None 
+			if kbp_manager is not None:
+				try:
+					nis_obj = nis.get_nis_score(
+						itype=itype,
+						phys_energy=en,
+						kbp_geom_metrics=geom_metrics,
+						kbp_manager=kbp_manager
+					)
+				except Exception as e:
+					print(f"Warning: Failed to calculate NIS v2.0 for {a1.id}-{a2.id} ({itype}): {e}", file=sys.stderr)
+			inter = Interaction(a1, a2, dist, itype, en, kbp_en, geom_metrics, nis_obj)
+			key = (min(a1.id, a2.id), max(a1.id, a2.id))
 			atom_interactions[key] = inter
 
 def find_residue_interactions(atom_interactions, residue_interactions):

@@ -1,11 +1,22 @@
 # output.py
 import json
 from datetime import datetime
+import numpy as np
+import dataclasses
 
 def recursive_to_dict(item):
 	"""
-	Recursively convert namedtuples, dictionaries, lists, tuples, and sets to dicts/lists.
+	Recursively convert namedtuples, dictionaries, lists, tuples, and sets to dicts/lists. Includes numpy types.
 	"""
+	# Check for numpy types FIRST
+	if isinstance(item, (np.floating, np.float64)):
+		return float(item)
+	if isinstance(item, (np.integer, np.int64)):
+		return int(item)
+	if isinstance(item, np.ndarray):
+		return item.tolist()
+	if dataclasses.is_dataclass(item):
+		item = dataclasses.asdict(item)
 	if isinstance(item, tuple) and hasattr(item, '_asdict'):
 		item = item._asdict()
 	if isinstance(item, dict):
@@ -21,7 +32,7 @@ def build_output_data(hori_instance):
 	and uses keys for referencing within residue interactions.
 	"""
 	metadata = {
-		"version": "2.0",
+		"version": "5.0",
 		"fn": hori_instance.filename,       # shortened key
 		"ft": hori_instance.file_type,
 		"ho": hori_instance.highest_order,
@@ -61,7 +72,8 @@ def build_output_data(hori_instance):
 			"kbp_energy": interaction.kbp_energy,
 			"type": interaction.int_type,
 			"dist": interaction.distance,
-			"geom_metrics": recursive_to_dict(interaction.geom_metrics)
+			"geom_metrics": recursive_to_dict(interaction.geom_metrics),
+			"nis": recursive_to_dict(interaction.nis)
 		}
 	# Build residue interactions:
 	residue_interactions = {}
