@@ -187,13 +187,16 @@ def lennard_jones(a1, a2, dist, amber_nonbonded):
 		return 0.0
 	s1, e1 = amber_nonbonded.get(a1.atom_type, (0.34, 0.2))
 	s2, e2 = amber_nonbonded.get(a2.atom_type, (0.34, 0.2))
-	sigma = 0.5*(s1 + s2)
+	# sigma values are stored in nm in ffnonbonded.itp; convert to Angstroms to
+	# match the distance units coming from the PDB coordinates.
+	sigma = 0.5*(s1 + s2) * 10.0
+	# epsilon values are already in kJ/mol from the source file.
 	epsilon = math.sqrt(e1*e2)
 	sr = sigma/dist
 	sr6 = sr**6
 	sr12 = sr6**2
-	lj_kcal = 4.0 * epsilon * (sr12 - sr6)
-	return lj_kcal * 4.184  # Convert to kJ/mol
+	# Standard Lennard-Jones 12-6 potential; returns kJ/mol.
+	return 4.0 * epsilon * (sr12 - sr6)
 
 def pi_pi_energy(ring1, ring2, user_params):
 	"""

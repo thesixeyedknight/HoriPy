@@ -124,35 +124,19 @@ pqr_to_amber = {
 	# Met
 	'SD':  'S',    
 
-	# Some aromatic side-chain atoms => 'CA' or other ring types
-	'CG':  'CA',
-	'CD1': 'CA',
-	'CD2': 'CA',
-	'CE1': 'CA',
-	'CE2': 'CA',
-	'CZ':  'CA',
-	'CE':  'CA',
-	'CH2': 'CA',
-	'CZ2': 'CA',
-	'CZ3': 'CA',
-	'CE3': 'CA',
-
-	# Histidine ring N
-	'ND1': 'NA',
-	'NE2': 'NA',
+# Histidine ring N
+'ND1': 'NA',
+'NE2': 'NA',
 
 	# Tryptophan ring N
 	'NE1': 'NA',
 
-	# Some hydrogen naming
-	'H2':  'H1',
-	'H3':  'H1',
-	'HA':  'H1',
-	'HA2': 'H1',
-	'HA3': 'H1',
-	'HB':  'HC',
-	'HB1': 'HC',
-	'HB2': 'HC',
+# Some hydrogen naming
+'H2':  'H1',
+'H3':  'H1',
+'HB':  'HC',
+'HB1': 'HC',
+'HB2': 'HC',
 	'HB3': 'HC',
 	'HD1': 'HC',
 	'HD2': 'HC',
@@ -175,6 +159,41 @@ pqr_to_amber = {
 	'HH21': 'H',
 	'HH22': 'H',
 }
+
+_aromatic_residues = {'PHE', 'TYR', 'TRP', 'HIS'}
+_aromatic_carbons = {
+	'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'CE', 'CH2', 'CZ2', 'CZ3', 'CE3'
+}
+_alpha_h_names = {'HA', 'HA2', 'HA3'}
+
+def _map_pqr_to_amber(pqr_name: str, resn: str) -> str:
+	"""
+	Map a PQR atom name to an AMBER atom type with residue context.
+	- Aromatic carbons get type CA only for aromatic residues; otherwise CT.
+	- Alpha hydrogens map to HC (aliphatic) instead of H1 (polar on N).
+	- Falls back to the legacy dictionary and simple heuristics.
+	"""
+	lookup = pqr_to_amber.get(pqr_name)
+	if lookup:
+		if pqr_name in _alpha_h_names:
+			return 'HC'
+		return lookup
+
+	if pqr_name in _aromatic_carbons:
+		return 'CA' if resn.upper() in _aromatic_residues else 'CT'
+	if pqr_name in _alpha_h_names:
+		return 'HC'
+
+	# fallback guess
+	if pqr_name.startswith('H'):
+		return 'HC'
+	if pqr_name.startswith('O'):
+		return 'O'
+	if pqr_name.startswith('N'):
+		return 'N'
+	if pqr_name.startswith('C'):
+		return 'CT'
+	return 'CT'
 
 #named tuples for atoms, residues, and interactions
 from collections import namedtuple
@@ -211,19 +230,7 @@ def parse_pqr_atoms_list(atoms):
 	for a in atoms:
 		atom_id+=1
 		pqr_name = a.name.strip()
-		amber_type = pqr_to_amber.get(pqr_name)
-		if amber_type is None:
-			# fallback guess
-			if pqr_name.startswith('H'):
-				amber_type = 'HC'
-			elif pqr_name.startswith('O'):
-				amber_type = 'O'
-			elif pqr_name.startswith('N'):
-				amber_type = 'N'
-			elif pqr_name.startswith('C'):
-				amber_type = 'CT'
-			else:
-				amber_type = 'CT'
+		amber_type = _map_pqr_to_amber(pqr_name, a.res_name)
 
 		atom = Atom(
 			id=atom_id,
@@ -288,24 +295,12 @@ def read_pdb_with_hydrogen(pdb_with_hydrogen):
 			parts = line.split()
 			if len(parts)<11:
 				print(line)
-			# PQR columns:
-			# 0    1     2    3   4   5    6       7       8      9       10
-			# ATOM oid   an  resn ch resi   x       y       z    charge   radius
-			pqr_name = parts[2].strip()  # e.g. NE, CZ, ...
-			# map to AMBER type
-			amber_type = pqr_to_amber.get(pqr_name)
-			if amber_type is None:
-				# fallback guess
-				if pqr_name.startswith('H'):
-					amber_type = 'HC'
-				elif pqr_name.startswith('O'):
-					amber_type = 'O'
-				elif pqr_name.startswith('N'):
-					amber_type = 'N'
-				elif pqr_name.startswith('C'):
-					amber_type = 'CT'
-				else:
-					amber_type = 'CT'
+				# PQR columns:
+				# 0    1     2    3   4   5    6       7       8      9       10
+				# ATOM oid   an  resn ch resi   x       y       z    charge   radius
+				pqr_name = parts[2].strip()  # e.g. NE, CZ, ...
+				# map to AMBER type
+				amber_type = _map_pqr_to_amber(pqr_name, parts[3])
 
 			# parse residue index
 			try:
