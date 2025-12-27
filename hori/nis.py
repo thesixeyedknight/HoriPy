@@ -18,13 +18,20 @@ import numpy as np
 from dataclasses import dataclass
 from pathlib import Path
 import sys
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any, List, TYPE_CHECKING
 
 # --- Type Hint Imports ---
 try:
     from hori.kbp_tools import KBPManager
-except ImportError:
-    KBPManager = "KBPManager"
+    _kbp_import_error: Optional[ImportError] = None
+except ImportError as e:
+    KBPManager = None  # type: ignore[assignment]
+    _kbp_import_error = e
+
+if TYPE_CHECKING:
+    from hori.kbp_tools import KBPManager as KBPManagerType
+else:
+    KBPManagerType = Any
 
 
 __all__ = ['get_nis_score', 'HoriNIS']
@@ -120,7 +127,7 @@ def get_nis_score(
     itype: str,
     phys_energy: Optional[float],
     kbp_geom_metrics: Dict[str, float],
-    kbp_manager: KBPManager
+    kbp_manager: KBPManagerType
 ) -> HoriNIS:
     """
     Calculates the NIS v2.0 (CDF) score for a single interaction.
@@ -135,6 +142,14 @@ def get_nis_score(
     
     # --- 1. Get Fold and CDF Pack (REMOVED) ---
     cdf_pack = CDF_PACK 
+
+    # Ensure KBP manager is available before proceeding
+    if kbp_manager is None:
+        if _kbp_import_error:
+            raise RuntimeError(
+                "KBPManager is unavailable because 'hori.kbp_tools' could not be imported."
+            ) from _kbp_import_error
+        raise ValueError("KBPManager instance is required to compute NIS scores.")
 
     # --- 2. Set Defaults ---
     alpha = 0.5
