@@ -271,8 +271,8 @@ def is_cation_pi(a1, a2, residues, user_params):
 	"""
 	result = {'is_cation_pi': False}
 
-	cation_atom, aromatic_res_atom = (a1, a2) if a1.charge > 0.5 and is_aromatic(a2) else \
-									 (a2, a1) if a2.charge > 0.5 and is_aromatic(a1) else \
+	cation_atom, aromatic_res_atom = (a1, a2) if a1.charge > 0.3 and is_aromatic(a2) else \
+									 (a2, a1) if a2.charge > 0.3 and is_aromatic(a1) else \
 									 (None, None)
 	if not cation_atom:
 		return result

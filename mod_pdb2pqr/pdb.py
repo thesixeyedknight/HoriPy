@@ -700,21 +700,21 @@ class ATOM:
             # CIF line is expected to be a list of fields (e.g., parsed from mmCIF).
             line = line.split()
             self.serial = int(line[1])
-            self.name = line[3]
-            self.alt_loc = line[4] if line[4] != "." else ""
-            self.res_name = line[5]
-            self.chain_id = line[6]
+            self.name = line[3].strip('"')
+            self.alt_loc = line[4].strip('"') if line[4] != "." else ""
+            self.res_name = line[5].strip('"')
+            self.chain_id = line[6].strip('"')
             self.res_seq = int(line[8])
-            self.ins_code = line[9] if line[9] != "?" else ""
+            self.ins_code = line[9].strip('"') if line[9] != "?" else ""
             self.x = float(line[10])
             self.y = float(line[11])
             self.z = float(line[12])
             try:
                 self.occupancy = float(line[13]) if line[13] != "?" else 0.00
                 self.temp_factor = float(line[14]) if line[14] != "?" else 0.00
-                self.seg_id = line[6] if line[6] != "?" else ""
-                self.element = line[2]
-                self.charge = line[15]
+                self.seg_id = line[6].strip('"') if line[6] != "?" else ""
+                self.element = line[2].strip('"')
+                self.charge = line[15].strip('"')
             except:
                 self.occupancy = 0.0
                 self.temp_factor = 0.0

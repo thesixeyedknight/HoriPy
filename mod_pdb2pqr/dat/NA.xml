@@ -46,6 +46,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O1P</name>
+      <altname>OP1</altname>
       <x>1.933410</x>
       <y>3.073374</y>
       <z>-1.081549</z>
@@ -53,6 +54,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O2P</name>
+      <altname>OP2</altname>
       <x>3.156547</x>
       <y>0.871841</y>
       <z>-1.292450</z>
@@ -357,6 +359,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O1P</name>
+      <altname>OP1</altname>
       <x>1.933410</x>
       <y>3.073374</y>
       <z>-1.081549</z>
@@ -364,6 +367,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O2P</name>
+      <altname>OP2</altname>
       <x>3.156547</x>
       <y>0.871841</y>
       <z>-1.292450</z>
@@ -652,6 +656,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O1P</name>
+      <altname>OP1</altname>
       <x>1.933410</x>
       <y>3.073374</y>
       <z>-1.081549</z>
@@ -659,6 +664,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O2P</name>
+      <altname>OP2</altname>
       <x>3.156547</x>
       <y>0.871841</y>
       <z>-1.292450</z>
@@ -973,6 +979,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O1P</name>
+      <altname>OP1</altname>
       <x>1.933410</x>
       <y>3.073374</y>
       <z>-1.081549</z>
@@ -980,6 +987,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O2P</name>
+      <altname>OP2</altname>
       <x>3.156547</x>
       <y>0.871841</y>
       <z>-1.292450</z>
@@ -1275,6 +1283,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O1P</name>
+      <altname>OP1</altname>
       <x>1.933410</x>
       <y>3.073374</y>
       <z>-1.081549</z>
@@ -1282,6 +1291,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
     </atom>
     <atom>
       <name>O2P</name>
+      <altname>OP2</altname>
       <x>3.156547</x>
       <y>0.871841</y>
       <z>-1.292450</z>

@@ -54,8 +54,9 @@ def atom_site(block):
                     # 12 - 13
                     line += "  "
                     # 14 - 16 ATOM NAME
-                    line += atoms.get_value("label_atom_id", i) + " " * (
-                        3 - len(atoms.get_value("label_atom_id", i))
+                    label_atom_id = atoms.get_value("label_atom_id", i).strip('"')
+                    line += label_atom_id + " " * (
+                        3 - len(label_atom_id)
                     )
                     # 17 ALT LOCATION
                     if atoms.get_value("label_alt_id", i) == ".":
@@ -126,8 +127,9 @@ def atom_site(block):
                     # 12 - 13
                     line += "  "
                     # 14 - 16 ATOM NAME
-                    line += atoms.get_value("label_atom_id", i) + " " * (
-                        3 - len(atoms.get_value("label_atom_id", i))
+                    label_atom_id = atoms.get_value("label_atom_id", i).strip('"')
+                    line += label_atom_id + " " * (
+                        3 - len(label_atom_id)
                     )
                     # 17 ALT LOCATION
                     if atoms.get_value("label_alt_id", i) == ".":
@@ -214,10 +216,9 @@ def atom_site(block):
                             # 12 - 13
                             line += "  "
                             # 14 - 16 ATOM NAME
-                            line += atoms.get_value(
-                                "label_atom_id", i
-                            ) + " " * (
-                                3 - len(atoms.get_value("label_atom_id", i))
+                            label_atom_id = atoms.get_value("label_atom_id", i).strip('"')
+                            line += label_atom_id + " " * (
+                                3 - len(label_atom_id)
                             )
                             # 17 ALT LOCATION
                             if atoms.get_value("label_alt_id", i) == ".":
@@ -294,10 +295,9 @@ def atom_site(block):
                             # 12 - 13
                             line += "  "
                             # 14 - 16 ATOM NAME
-                            line += atoms.get_value(
-                                "label_atom_id", i
-                            ) + " " * (
-                                3 - len(atoms.get_value("label_atom_id", i))
+                            label_atom_id = atoms.get_value("label_atom_id", i).strip('"')
+                            line += label_atom_id + " " * (
+                                3 - len(label_atom_id)
                             )
                             # 17      ALT LOCATION
                             if atoms.get_value("label_alt_id", i) == ".":

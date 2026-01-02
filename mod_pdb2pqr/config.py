@@ -186,4 +186,4 @@ VACUUM_PERMIT = 8.8541878128e-12
 BOLTZMANN = 1.380649e-23
 
 #: Charge deviation considered to be non-integer
-CHARGE_ERROR = 1e-3
+CHARGE_ERROR = 0.5
