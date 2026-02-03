@@ -1,7 +1,8 @@
-# Hori: Molecular Interaction Analysis Toolkit
+# HORI-EN: Molecular Interaction Analysis Toolkit
 
-**Hori** is a Python library for analyzing molecular structures, focusing on computing higher-order interactions, solvent-accessible surface area (SASA), and energy-based residue interactions in biomolecules.
-
+**Hori** is a Python library for analyzing molecular structures, focusing on computing higher-order interactions, solvent-accessible surface area (SASA), and energy-based residue interactions in biomolecules. 
+> [!NOTE]
+> This work will be presented at EMBL Symposium: AI in Biology (10th-13th March 2026) at Heidelberg, Germany
 ## Features
 - Parses **PDB** and **CIF** files for protein structures.
 - Computes atomic and residue-level interactions (hydrogen bonds, salt bridges, van der Waals forces, etc.).
