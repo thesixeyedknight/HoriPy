@@ -4,6 +4,7 @@
 from hori.parsing import read_file, parse_pqr_atoms_list, atom_dict_to_pdb
 from hori.pdb2pqr_runner import run_pdb2pqr
 from hori.interactions import (populate_bonds, build_distance_map_parallel,
+							   build_distance_map_from_grid,
 							   find_atomic_interactions, find_residue_interactions)
 from hori.sasa import compute_sasa_data
 from hori.higher_order import parallel_find_higher_order_interactions
@@ -97,20 +98,19 @@ class Hori:
 		populate_bonds(self.residues, self.bonds)
 		self.residues = compute_ramachandran_angles(self.residues)
 
-		# --- pike nanda calculations ---
-		# --- Create Spatial Grid (if using Pike & Nanda) ---
-		if self.dielectric_method == 'pike_nanda' and self.pike_nanda_params and self.atoms:
-			influence_radius = self.pike_nanda_params.get('POLARIZABILITY_INFLUENCE_RADIUS')
-			if influence_radius is not None and influence_radius > 0:
-				grid_cell_size = influence_radius 
-				grid, min_c, actual_cs = create_spatial_grid(self.atoms, grid_cell_size)
-				self.spatial_grid_data = {'grid': grid, 'min_coords': min_c, 'cell_size': actual_cs}
-				print(f"Spatial grid created for Pike & Nanda method with cell size: {actual_cs:.2f} Å")
-			else:
-				print("Warning: POLARIZABILITY_INFLUENCE_RADIUS not defined or invalid in Pike & Nanda params. Spatial grid not created. Pike method may fail.")
-				self.spatial_grid_data = None 
-				# Fallback to bulk if grid is essential
-				print("Falling back to 'bulk' dielectric method as spatial grid for Pike & Nanda could not be created.")
+		# --- Create Spatial Grid (used for interaction finding and optionally Pike & Nanda) ---
+		if self.atoms:
+			grid_cell_size = self.cutoff  # Use interaction cutoff as cell size
+			grid, min_c, actual_cs = create_spatial_grid(self.atoms, grid_cell_size)
+			self.spatial_grid_data = {'grid': grid, 'min_coords': min_c, 'cell_size': actual_cs}
+			print(f"Spatial grid created with cell size: {actual_cs:.2f} Å")
+		else:
+			self.spatial_grid_data = None
+
+		# Validate Pike & Nanda prerequisites
+		if self.dielectric_method == 'pike_nanda':
+			if not self.pike_nanda_params or not self.spatial_grid_data:
+				print("Warning: Pike & Nanda prerequisites missing. Falling back to 'bulk' dielectric method.")
 				self.dielectric_method = 'bulk'
 
 
@@ -162,7 +162,12 @@ class Hori:
 
 
 		# --- Interaction Calculations ---
-		build_distance_map_parallel(self.residues, self.distance_map, cutoff=self.cutoff, num_cores=self.num_cores)
+		if self.spatial_grid_data:
+			self.distance_map = build_distance_map_from_grid(
+				self.atoms, self.residues, self.spatial_grid_data, cutoff=self.cutoff
+			)
+		else:
+			build_distance_map_parallel(self.residues, self.distance_map, cutoff=self.cutoff, num_cores=self.num_cores)
 		find_atomic_interactions(self.distance_map, self.atoms, self.bonds, self.residues,
 								 self.atom_interactions, self.amber_nonbonded, self.user_params, self, kbp_manager=self.kbp_manager)
 		find_residue_interactions(self.atom_interactions, self.residue_interactions)

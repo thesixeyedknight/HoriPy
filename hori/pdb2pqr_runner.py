@@ -1,3 +1,4 @@
+import os
 import tempfile
 import subprocess as sp
 import argparse
@@ -26,7 +27,7 @@ def run_pdb2pqr(atom_lines, file_type, ph=7.0):
 	# Step 2: Create an argparse.Namespace with required arguments
 	args = argparse.Namespace(
 		input_path='custom_input',       # Dummy value since we're using a custom PDB list
-		output_pqr='dummy_output.pqr',   # Dummy value; output won't be used if modified
+		output_pqr=os.devnull,            # Discard PQR file output (written by mod_pdb2pqr but not needed)
 		log_level='ERROR',            # Suppress logging
 		ff='AMBER',                       # Default forcefield; adjust as needed
 		userff=None,

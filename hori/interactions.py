@@ -4,10 +4,12 @@ from collections import namedtuple
 from .classify_interactions import classify_interaction
 from .energy import compute_interaction_energy
 import sys
+import math
 import dataclasses
 from . import nis
 from .nis import HoriNIS
 from typing import Optional, Dict, Any
+from .spatial_utils import get_atoms_in_cutoff_from_grid
 
 def populate_bonds(residues, bonds):
 	"""
@@ -173,6 +175,46 @@ def build_distance_map_parallel(residues, distance_map, cutoff=7.0, num_cores=1)
 	for result in results:
 		distance_map.update(result)
 	print(f"Distance map size: {len(distance_map)}, cutoff={cutoff}")
+
+def build_distance_map_from_grid(atoms, residues, grid_data, cutoff=7.0):
+	"""
+	Build the distance map using the spatial grid for neighbor lookup
+	instead of enumerating all residue pairs.
+
+	For each atom, query the grid for neighbors within cutoff. Only keep
+	inter-residue pairs (skip same-residue and sequential neighbors on
+	the same chain, matching the original filter in build_distance_map_parallel).
+
+	Args:
+		atoms (dict): Dictionary mapping atom ID to Atom namedtuple.
+		residues (dict): Dictionary mapping (chain, resi) to ResidueRecord.
+		grid_data (dict): Spatial grid data from create_spatial_grid.
+		cutoff (float): Distance cutoff in Angstroms.
+
+	Returns:
+		dict: Distance map with keys (min_id, max_id) and values as distances.
+	"""
+	distance_map = {}
+
+	for atom_id, atom in atoms.items():
+		neighbors = get_atoms_in_cutoff_from_grid(
+			(atom.x, atom.y, atom.z), atom.id,
+			atoms, grid_data, cutoff
+		)
+		for neighbor in neighbors:
+			# Skip same-residue and sequential residues on the same chain
+			if atom.chain == neighbor.chain and abs(atom.resi - neighbor.resi) < 2:
+				continue
+			key = (min(atom.id, neighbor.id), max(atom.id, neighbor.id))
+			if key not in distance_map:
+				dx = atom.x - neighbor.x
+				dy = atom.y - neighbor.y
+				dz = atom.z - neighbor.z
+				dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+				distance_map[key] = dist
+
+	print(f"Distance map size: {len(distance_map)}, cutoff={cutoff}")
+	return distance_map
 
 Interaction = namedtuple('Interaction', [
 		'atom1', 'atom2',
