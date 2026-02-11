@@ -67,6 +67,7 @@ mod_pdb2pqr/dat/*.tmp
 
 # Ignore scripts and build artifacts
 scripts/
+.agent
 *.sh
 *.bat
 
