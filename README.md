@@ -15,8 +15,8 @@
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/thesixeyedknight/hori.git
-cd hori
+git clone https://github.com/thesixeyedknight/HoriPy.git
+cd HoriPy
 pip install -r requirements.txt
 ```
 
